@@ -1,0 +1,9 @@
+              precision    recall  f1-score   support
+
+     Benigno       0.91      0.91      0.91       800
+     Maligno       0.88      0.92      0.90       800
+ Pré-Maligno       0.98      0.94      0.96       800
+
+    accuracy                           0.92      2400
+   macro avg       0.92      0.92      0.92      2400
+weighted avg       0.92      0.92      0.92      2400

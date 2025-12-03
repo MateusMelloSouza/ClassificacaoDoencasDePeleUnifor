@@ -5,7 +5,6 @@ from functools import lru_cache
 from pathlib import Path
 
 import torch
-import torchvision.models as models
 from torchvision import transforms
 from PIL import Image
 import timm
@@ -13,6 +12,18 @@ import numpy as np
 
 
 CLASS_NAMES_PT = ["Benigno", "Maligno", "Pré-Maligno"]
+
+SPECIALIST_CLASS_ORDER = {
+    "benignos_vs_malignos": ["Benigno", "Maligno"],
+    "malignos_vs_premalignos": ["Maligno", "Pré-Maligno"],
+    "premalignos_vs_benignos": ["Pré-Maligno", "Benigno"],
+}
+ENSEMBLE_GENERAL_WEIGHT = 0.6280209863015969
+SPECIALIST_WEIGHTS = {
+    "benignos_vs_malignos": 0.3072561496520236,
+    "malignos_vs_premalignos": 9.763103177869513e-05,
+    "premalignos_vs_benignos": 9.763103177869513e-05,
+}
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -22,16 +33,6 @@ _TRANSFORM = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
 ])
-
-SPECIALIST_PAIRS = {
-    ("Benigno", "Maligno"): "benignos_vs_malignos",
-    ("Maligno", "Benigno"): "benignos_vs_malignos",
-    ("Maligno", "Pré-Maligno"): "malignos_vs_premalignos",
-    ("Pré-Maligno", "Maligno"): "malignos_vs_premalignos",
-    ("Benigno", "Pré-Maligno"): "premalignos_vs_benignos",
-    ("Pré-Maligno", "Benigno"): "premalignos_vs_benignos",
-}
-
 
 def _get_device() -> torch.device:
     return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -104,11 +105,6 @@ def _load_specialist_model(pair_name: str):
     return model, device
 
 
-def _get_top_2_classes(probs: np.ndarray) -> tuple[str, str]:
-    top_2_indices = np.argsort(probs)[-2:][::-1]
-    return CLASS_NAMES_PT[top_2_indices[0]], CLASS_NAMES_PT[top_2_indices[1]]
-
-
 def classify_image_bytes(image_bytes: bytes) -> dict:
     device = _get_device()
 
@@ -120,39 +116,43 @@ def classify_image_bytes(image_bytes: bytes) -> dict:
         logits = general_model(tensor)
         general_probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
 
-    top_class_1, top_class_2 = _get_top_2_classes(general_probs)
-    specialist_key = SPECIALIST_PAIRS.get((top_class_1, top_class_2))
-    # specialist_key = None  # Desabilitar especialistas para teste com modelo geral apenas
-    specialist_model, _ = _load_specialist_model(specialist_key) if specialist_key else (None, None)
+    # Combina probabilidades do generalista com todos os especialistas disponíveis.
+    combined_probs = general_probs * ENSEMBLE_GENERAL_WEIGHT
+    specialist_keys_used: list[str] = []
 
-    if specialist_model is None:
-        top_idx = int(general_probs.argmax())
-        return {
-            "prediction": CLASS_NAMES_PT[top_idx],
-            "probabilities": {
-                CLASS_NAMES_PT[i]: float(round(prob, 4)) for i, prob in enumerate(general_probs)
-            },
-            "specialist_used": False
-        }
+    for specialist_key, class_order in SPECIALIST_CLASS_ORDER.items():
+        specialist_model, specialist_device = _load_specialist_model(specialist_key)
+        if specialist_model is None:
+            continue
 
-    with torch.inference_mode():
-        specialist_logits = specialist_model(tensor)
-        specialist_probs = torch.softmax(specialist_logits, dim=1)[0].cpu().numpy()
+        with torch.inference_mode():
+            tensor_on_device = tensor if tensor.device == specialist_device else tensor.to(specialist_device)
+            specialist_logits = specialist_model(tensor_on_device)
+            specialist_probs = torch.softmax(specialist_logits, dim=1)[0].cpu().numpy()
 
-    specialist_classes = sorted([top_class_1, top_class_2])
-    final_prediction = specialist_classes[int(specialist_probs.argmax())]
+        weight = SPECIALIST_WEIGHTS.get(specialist_key, 0.0)
+        for idx, class_name in enumerate(class_order):
+            if class_name not in CLASS_NAMES_PT or idx >= len(specialist_probs):
+                continue
+            general_index = CLASS_NAMES_PT.index(class_name)
+            combined_probs[general_index] += specialist_probs[idx] * weight
 
-    all_probs = {}
-    specialist_idx = 0
-    for class_name in CLASS_NAMES_PT:
-        if class_name in specialist_classes:
-            all_probs[class_name] = float(round(specialist_probs[specialist_idx], 4))
-            specialist_idx += 1
-        else:
-            all_probs[class_name] = 0.0
+        specialist_keys_used.append(specialist_key)
+
+    combined_sum = combined_probs.sum()
+    if combined_sum > 0:
+        combined_probs /= combined_sum
+
+    final_idx = int(combined_probs.argmax())
+    final_prediction = CLASS_NAMES_PT[final_idx]
+
+    all_probs = {
+        CLASS_NAMES_PT[i]: float(round(prob, 4)) for i, prob in enumerate(combined_probs)
+    }
 
     return {
         "prediction": final_prediction,
         "probabilities": all_probs,
-        "specialist_used": True
+        "specialist_used": bool(specialist_keys_used),
+        "specialists": specialist_keys_used,
     }

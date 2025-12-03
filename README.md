@@ -109,3 +109,26 @@ python scripts/augmentation/augment_skin_images.py
 ```
 
 Todos os scripts são interativos e guiarão você através das opções disponíveis.
+
+## 🧠 Classificador Ensemble
+
+O sistema de classificação utiliza um modelo **generalista** baseado em `ResNet-RS50` com 3 saídas (Benigno, Maligno, Pré-Maligno) combinado com uma família de **especialistas binários**. Os pesos otimizados por algoritmo genético são aplicados em tempo de inferência dentro de `scripts/classification/service.py`:
+
+- **Peso do generalista:** `0.6280`
+- **Benignos vs. Malignos:** `0.2073`
+- **Malignos vs. Pré-Malignos:** `0.1646`
+- **Pré-Malignos vs. Benignos:** `9.76e-05`
+
+Fluxo em produção:
+
+1. A imagem é normalizada usando mean/std do ImageNet e processada pelo generalista (`ResNet-RS50`) carregado em `Treinamento Modelos/resnetrs50/best_model.pth`.
+2. As probabilidades do generalista são ponderadas e, em seguida, cada especialista disponível (`Treinamento Modelos/especialistas/resnetrs50/<par>/best_model.pth`) gera scores para suas duas classes.
+3. Os scores combinados são renormalizados para formar a distribuição final, retornando a predição majoritária e informando quais especialistas foram acionados.
+
+Para reproduzir a avaliação, execute:
+
+```bash
+python tests/test_classify.py
+```
+
+Esse comando gera matriz de confusão normalizada, relatório de classificação e salva os artefatos em `results/`.
