@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import argparse
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -14,7 +15,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from scripts.classification.service import CLASS_NAMES_PT, classify_image_bytes
+from scripts.classification.service import (
+    CLASS_NAMES_PT,
+    classify_image_bytes,
+    set_inference_mode,
+    VALID_INFERENCE_MODES,
+)
 
 
 DATASET_ROOT = Path("/home/mateus/data/val")
@@ -209,8 +215,28 @@ def evaluate_dataset(
     }
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Avalia o classificador com diferentes modos de inferência.")
+    parser.add_argument(
+        "--mode",
+        choices=sorted(VALID_INFERENCE_MODES),
+        default=None,
+        help="Modo de inferência a utilizar (ensemble padrão).",
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Diretório onde salvar relatórios e figuras.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
-    evaluate_dataset()
+    args = _parse_args()
+    if args.mode:
+        set_inference_mode(args.mode)
+    evaluate_dataset(results_dir=args.results_dir)
 
 
 if __name__ == "__main__":

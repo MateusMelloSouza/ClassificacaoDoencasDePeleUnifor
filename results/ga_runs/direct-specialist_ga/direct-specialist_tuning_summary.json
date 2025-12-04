@@ -1,0 +1,111 @@
+{
+  "mode": "direct-specialist",
+  "best_accuracy": 0.9275,
+  "best_weights": [
+    0.6490607162059271,
+    0.35093928379407285
+  ],
+  "final_result": {
+    "accuracy": 0.9275,
+    "classification_report": "              precision    recall  f1-score   support\n\n     Benigno       0.91      0.90      0.91       800\n     Maligno       0.90      0.91      0.91       800\n Pr\u00e9-Maligno       0.97      0.97      0.97       800\n\n    accuracy                           0.93      2400\n   macro avg       0.93      0.93      0.93      2400\nweighted avg       0.93      0.93      0.93      2400\n"
+  },
+  "parameters": {
+    "population_size": 10,
+    "generations": 10,
+    "mutation_rate": 0.8,
+    "mutation_scale": 0.1,
+    "seed": 36
+  },
+  "class_labels": [
+    "Benigno",
+    "Maligno",
+    "Pr\u00e9-Maligno"
+  ],
+  "history": [
+    {
+      "generation": 1,
+      "accuracy": 0.9270833333333334,
+      "weights": [
+        0.6890377101744847,
+        0.31096228982551544
+      ]
+    },
+    {
+      "generation": 2,
+      "accuracy": 0.9270833333333334,
+      "weights": [
+        0.6890377101744847,
+        0.31096228982551544
+      ]
+    },
+    {
+      "generation": 3,
+      "accuracy": 0.9270833333333334,
+      "weights": [
+        0.6890377101744847,
+        0.31096228982551544
+      ]
+    },
+    {
+      "generation": 4,
+      "accuracy": 0.9270833333333334,
+      "weights": [
+        0.6890377101744847,
+        0.31096228982551544
+      ]
+    },
+    {
+      "generation": 5,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    },
+    {
+      "generation": 6,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    },
+    {
+      "generation": 7,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    },
+    {
+      "generation": 8,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    },
+    {
+      "generation": 9,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    },
+    {
+      "generation": 10,
+      "accuracy": 0.9275,
+      "weights": [
+        0.6490607162059271,
+        0.35093928379407285
+      ]
+    }
+  ],
+  "timestamp": "2025-12-03T22:52:08.032395",
+  "outputs": {
+    "classification_report_path": "/home/mateus/ClassificacaoDoencasDePeleUnifor/results/ga_runs/direct-specialist_ga/classification_report.txt",
+    "confusion_matrix_figure": "/home/mateus/ClassificacaoDoencasDePeleUnifor/results/ga_runs/direct-specialist_ga/validation_confusion_report.png"
+  }
+}
