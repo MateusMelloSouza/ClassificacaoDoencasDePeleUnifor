@@ -148,6 +148,40 @@ Pesos do ensemble (otimizados via algoritmo genético):
 - Direct-specialist: identifica o par mais provável (top-1 × segundo lugar) e repondera apenas esse especialista com pesos definidos via `set_direct_weights`.
 - Todas as saídas são renormalizadas para garantir soma 1. Metadados de qual especialista foi acionado acompanham o dicionário retornado por `classify_image_bytes`.
 
+### Fluxo completo da imagem em cada modo testado
+
+**Pré-processamento comum**
+
+1. A imagem bruta (RGB) passa pelo mesmo pipeline de normalização usado em treino: redimensionamento 448×448 com padding, conversão para tensor e normalização com `mean/std` do ImageNet.
+2. O tensor é enviado simultaneamente para o modelo generalista e, quando aplicável, cacheado para reutilização pelos especialistas (evita redecodificar/reescalar a imagem).
+
+**Modo `ensemble`**
+
+1. O generalista produz `p_general = [p_benigno, p_pre_maligno, p_maligno]`.
+2. Cada especialista recebe o tensor já normalizado e gera `p_pair = [p_classe_a, p_classe_b]` do seu par específico.
+3. O serviço converte `p_pair` em probabilidades alinhadas às três classes globais (ex.: o par Benignos×Malignos distribui suas probabilidades para os índices correspondentes e atribui 0 à classe ausente).
+4. Todos os vetores são ponderados pelos pesos otimizados (`set_ensemble_weights`) e somados componente a componente.
+5. O vetor combinado é renormalizado (dividido pela soma total) e retorna como saída final, junto com logs indicando quais especialistas participaram.
+
+**Modo `cascade`**
+
+1. O generalista roda primeiro. Calculamos `confidence = max(p_general)`.
+2. Se `confidence ≥ CASCADE_THRESHOLD` (por padrão 0,7), devolvemos o próprio `p_general` ponderado pelos pesos do generalista e encerramos.
+3. Caso contrário, identificamos o par composto pela classe top-1 e top-2 do generalista.
+4. Apenas o especialista correspondente é executado; seu vetor binário é reformatado para as três classes globais.
+5. Misturamos `p_general` e `p_specialist` usando `set_cascade_weights(general, specialist)` (tipicamente algo como 0,4 × generalista + 0,6 × especialista para as classes envolvidas).
+6. Renormalizamos e retornamos o resultado, registrando que houve queda para o segundo estágio.
+
+**Modo `direct-specialist`**
+
+1. Executamos o generalista apenas para definir o par dominante: localizamos o índice com maior probabilidade e o segundo maior.
+2. Pulamos os demais especialistas e rodamos somente aquele que cobre o par escolhido.
+3. Aplicamos os pesos definidos por `set_direct_weights` diretamente sobre `p_general` (peso do generalista) e sobre o vetor binário do especialista (peso do especialista), sem considerar os outros pares.
+4. Para a classe não pertencente ao par selecionado, mantemos a probabilidade do generalista intacta.
+5. Renormalizamos e retornamos o dicionário com o campo `"specialist_used"` preenchido explicitamente, já que sempre existe delegação.
+
+Esse detalhamento garante visibilidade completa de como a mesma imagem percorre o generalista e os especialistas em cada cenário de teste.
+
 Passos em produção:
 
 1. A imagem (normalizada com mean/std do ImageNet) passa pelo generalista `Treinamento Modelos/resnetrs50/best_model.pth`, gerando `p_general`.
